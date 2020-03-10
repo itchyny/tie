@@ -16,6 +16,10 @@ type Y1 interface {
 	FooY() int
 }
 
+type z1 struct{}
+
+func (z *z1) FooZ() {}
+
 func TestBuilder(t *testing.T) {
 	got, err := New(&x1{}).With(&y1{}).Build()
 	if err != nil {
@@ -30,9 +34,29 @@ func TestBuilder(t *testing.T) {
 func TestBuilderDependencyNotEnoughError(t *testing.T) {
 	_, err := New(&x1{}).Build()
 	if err == nil {
-		t.Errorf("expected error but got nil")
+		t.Fatal("expected error but got nil")
 	}
 	if got, expected := err.Error(), "dependency not enough: x1#y"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderUnusedComponentError(t *testing.T) {
+	_, err := New(&x1{}).With(&y1{}).With(&z1{}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "unused component: github.com/itchyny/tie.z1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderUnusedComponentError2(t *testing.T) {
+	_, err := New(&x1{}).With(&y1{}).With(z1{}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "unused component: github.com/itchyny/tie.z1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -91,7 +115,7 @@ func TestBuilderDiamond(t *testing.T) {
 func TestBuilderDiamondDependencyNotEnoughError(t *testing.T) {
 	_, err := New(&x2{}).With(&y2{}).With(&z2{}).Build()
 	if err == nil {
-		t.Errorf("expected error but got nil")
+		t.Fatal("expected error but got nil")
 	}
 	if got, expected := err.Error(), "dependency not enough: y2#w"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
@@ -105,7 +129,7 @@ type xConflict struct {
 func TestBuilderInterfaceConflictError(t *testing.T) {
 	_, err := New(&xConflict{}).Build()
 	if err == nil {
-		t.Errorf("expected error but got nil")
+		t.Fatal("expected error but got nil")
 	}
 	if got, expected := err.Error(), "interface conflict: github.com/itchyny/tie.Y1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)

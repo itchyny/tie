@@ -17,32 +17,51 @@ type builder struct {
 	value    interface{}
 	rv       reflect.Value
 	rt       reflect.Type
-	builders []Builder
+	builders []*builder
+	unused   reflect.Type
 }
 
 // New creates a new Builder.
 func New(v interface{}) Builder {
 	rv := reflect.ValueOf(v)
-	return &builder{v, rv, rv.Type().Elem(), nil}
+	return &builder{value: v, rv: rv, rt: rv.Type().Elem()}
 }
 
 func (b *builder) With(v interface{}) Builder {
+	if _, ok := b.with(v); !ok {
+		b.unused = reflect.TypeOf(v)
+	}
+	return b
+}
+
+func (b *builder) with(v interface{}) (Builder, bool) {
+	var ok bool
 	t := reflect.TypeOf(v)
 	for i := 0; i < b.rt.NumField(); i++ {
 		if t.ConvertibleTo(b.rt.Field(i).Type) {
 			w := b.rv.Elem().Field(i)
 			reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(reflect.ValueOf(v))
-			b.builders = append(b.builders, New(v))
+			b.builders = append(b.builders, New(v).(*builder))
+			ok = true
 			break
 		}
 	}
 	for _, b := range b.builders {
-		b.With(v)
+		if _, k := b.with(v); k {
+			ok = true
+		}
 	}
-	return b
+	return b, ok
 }
 
 func (b *builder) Build() (interface{}, error) {
+	if t := b.unused; t != nil {
+		return nil, fmt.Errorf("unused component: %s", stringify(t))
+	}
+	return b.build()
+}
+
+func (b *builder) build() (interface{}, error) {
 	m := make(map[string]struct{}, b.rt.NumField())
 	for i := 0; i < b.rt.NumField(); i++ {
 		t := b.rt.Field(i).Type
@@ -58,7 +77,7 @@ func (b *builder) Build() (interface{}, error) {
 		}
 	}
 	for _, b := range b.builders {
-		if _, err := b.Build(); err != nil {
+		if _, err := b.build(); err != nil {
 			return nil, err
 		}
 	}
@@ -71,4 +90,11 @@ func (b *builder) MustBuild() interface{} {
 		panic(err)
 	}
 	return v
+}
+
+func stringify(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		return stringify(t.Elem())
+	}
+	return t.PkgPath() + "." + t.Name()
 }
