@@ -13,90 +13,68 @@ type Builder interface {
 	MustBuild() interface{}
 }
 
-type builder struct {
-	values   []interface{}
-	unused   []bool
-	rv       reflect.Value
-	rt       reflect.Type
-	builders []*builder
-}
+type builder []interface{}
 
 // New creates a new Builder.
 func New(v interface{}) Builder {
-	return &builder{
-		values: []interface{}{v},
-		unused: []bool{false},
-		rv:     reflect.ValueOf(v),
-		rt:     reflect.TypeOf(v).Elem(),
-	}
+	return builder{v}
 }
 
-func (b *builder) With(v interface{}) Builder {
-	c := New(v).(*builder)
-	for i, w := range b.values {
-		if _, ok := c.with(w); ok {
-			b.unused[i] = false
-		}
-	}
-	b.values = append(b.values, v)
-	_, ok := b.with(v)
-	b.unused = append(b.unused, !ok)
-	return b
+func (b builder) With(v interface{}) Builder {
+	return append(b, v)
 }
 
-func (b *builder) with(v interface{}) (Builder, bool) {
-	var ok bool
-	t := reflect.TypeOf(v)
-	for i := 0; i < b.rt.NumField(); i++ {
-		if t.ConvertibleTo(b.rt.Field(i).Type) {
-			w := b.rv.Elem().Field(i)
-			reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(reflect.ValueOf(v))
-			b.builders = append(b.builders, New(v).(*builder))
-			ok = true
-			break
+func (b builder) Build() (interface{}, error) {
+	unused := make([]bool, len(b))
+	vs := make([]reflect.Value, len(b))
+	ts := make([]reflect.Type, len(b))
+	for i, v := range b {
+		unused[i] = true
+		vs[i] = reflect.ValueOf(v)
+		ts[i] = reflect.TypeOf(v).Elem()
+	}
+	for _, t := range ts {
+		m := make(map[string]struct{}, t.NumField())
+		for i := 0; i < t.NumField(); i++ {
+			t := t.Field(i).Type
+			key := t.PkgPath() + "." + t.Name()
+			if _, ok := m[key]; ok {
+				return nil, fmt.Errorf("interface conflict: %s", key)
+			}
+			m[key] = struct{}{}
 		}
 	}
-	for _, b := range b.builders {
-		if _, k := b.with(v); k {
-			ok = true
+	for i := 1; i < len(b); i++ {
+		v, t := vs[i], reflect.TypeOf(b[i])
+		for j, w := range vs {
+			u := ts[j]
+			for k := 0; k < u.NumField(); k++ {
+				if t.ConvertibleTo(u.Field(k).Type) {
+					w := w.Elem().Field(k)
+					reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(v)
+					unused[i] = false
+					break
+				}
+			}
 		}
 	}
-	return b, ok
+	for i := 1; i < len(b); i++ {
+		if unused[i] {
+			return nil, fmt.Errorf("unused component: %s", stringify(ts[i]))
+		}
+	}
+	for i, v := range vs {
+		t := ts[i]
+		for i := 0; i < t.NumField(); i++ {
+			if v.Elem().Field(i).Kind() == reflect.Interface && v.Elem().Field(i).IsNil() {
+				return nil, fmt.Errorf("dependency not enough: %s#%s", t.Name(), t.Field(i).Name)
+			}
+		}
+	}
+	return b[0], nil
 }
 
-func (b *builder) Build() (interface{}, error) {
-	for i, unused := range b.unused {
-		if unused {
-			return nil, fmt.Errorf("unused component: %s", stringify(reflect.TypeOf(b.values[i])))
-		}
-	}
-	return b.build()
-}
-
-func (b *builder) build() (interface{}, error) {
-	m := make(map[string]struct{}, b.rt.NumField())
-	for i := 0; i < b.rt.NumField(); i++ {
-		t := b.rt.Field(i).Type
-		key := t.PkgPath() + "." + t.Name()
-		if _, ok := m[key]; ok {
-			return nil, fmt.Errorf("interface conflict: %s", key)
-		}
-		m[key] = struct{}{}
-	}
-	for i := 0; i < b.rt.NumField(); i++ {
-		if b.rv.Elem().Field(i).Kind() == reflect.Interface && b.rv.Elem().Field(i).IsNil() {
-			return nil, fmt.Errorf("dependency not enough: %s#%s", b.rt.Name(), b.rt.Field(i).Name)
-		}
-	}
-	for _, b := range b.builders {
-		if _, err := b.build(); err != nil {
-			return nil, err
-		}
-	}
-	return b.values[0], nil
-}
-
-func (b *builder) MustBuild() interface{} {
+func (b builder) MustBuild() interface{} {
 	v, err := b.Build()
 	if err != nil {
 		panic(err)
