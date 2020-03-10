@@ -37,6 +37,67 @@ func TestBuilderDependencyNotEnoughError(t *testing.T) {
 	}
 }
 
+type x2 struct {
+	y Y2
+	z Z2
+}
+
+func (x *x2) FooX() int { return x.y.FooY() + x.z.FooZ() }
+
+type Y2 interface {
+	FooY() int
+}
+
+type Z2 interface {
+	FooZ() int
+}
+
+type W2 interface {
+	FooW() int
+}
+
+type y2 struct {
+	w W2
+}
+
+func (y *y2) FooY() int { return y.w.FooW() }
+
+type z2 struct {
+	w W2
+}
+
+func (z *z2) FooZ() int { return z.w.FooW() }
+
+type w2 struct {
+	v int
+}
+
+func (w *w2) FooW() int {
+	w.v++
+	return w.v
+}
+
+func TestBuilderDiamond(t *testing.T) {
+	got, err := New(&x2{}).With(&y2{}).With(&z2{}).With(&w2{24}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x2)
+	if got, expected := x.FooX(), 51; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderDiamondDependencyNotEnoughError(t *testing.T) {
+	_, err := New(&x2{}).With(&y2{}).With(&z2{}).Build()
+	if err == nil {
+		t.Errorf("expected error but got nil")
+	}
+	if got, expected := err.Error(), "dependency not enough: y2#w"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 type xConflict struct {
 	y, z Y1
 }

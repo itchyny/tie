@@ -14,15 +14,16 @@ type Builder interface {
 }
 
 type builder struct {
-	value  interface{}
-	vValue reflect.Value
-	vType  reflect.Type
+	value    interface{}
+	vValue   reflect.Value
+	vType    reflect.Type
+	builders []Builder
 }
 
 // New creates a new Builder.
 func New(v interface{}) Builder {
 	value := reflect.ValueOf(v)
-	return &builder{v, value, value.Type().Elem()}
+	return &builder{v, value, value.Type().Elem(), nil}
 }
 
 func (b *builder) With(v interface{}) Builder {
@@ -31,8 +32,12 @@ func (b *builder) With(v interface{}) Builder {
 		if t.ConvertibleTo(b.vType.Field(i).Type) {
 			w := b.vValue.Elem().Field(i)
 			reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(reflect.ValueOf(v))
+			b.builders = append(b.builders, New(v))
 			break
 		}
+	}
+	for _, b := range b.builders {
+		b.With(v)
 	}
 	return b
 }
@@ -50,6 +55,11 @@ func (b *builder) Build() (interface{}, error) {
 	for i := 0; i < b.vType.NumField(); i++ {
 		if b.vValue.Elem().Field(i).Kind() == reflect.Interface && b.vValue.Elem().Field(i).IsNil() {
 			return nil, fmt.Errorf("dependency not enough: %s#%s", b.vType.Name(), b.vType.Field(i).Name)
+		}
+	}
+	for _, b := range b.builders {
+		if _, err := b.Build(); err != nil {
+			return nil, err
 		}
 	}
 	return b.value, nil
