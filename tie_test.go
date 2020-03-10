@@ -176,7 +176,7 @@ func TestBuilderInterfaceConflictError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "interface conflict: github.com/itchyny/tie.Y1"; got != expected {
+	if got, expected := err.Error(), "interface conflict in xConflict: github.com/itchyny/tie.Y1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -190,7 +190,7 @@ func TestBuilderInterfaceConflictError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "interface conflict: github.com/itchyny/tie.Y1"; got != expected {
+	if got, expected := err.Error(), "interface conflict in xConflict: github.com/itchyny/tie.Y1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

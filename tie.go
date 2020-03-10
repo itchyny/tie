@@ -36,10 +36,9 @@ func (b builder) Build() (interface{}, error) {
 	for _, t := range ts {
 		m := make(map[string]struct{}, t.NumField())
 		for i := 0; i < t.NumField(); i++ {
-			t := t.Field(i).Type
-			key := t.PkgPath() + "." + t.Name()
+			key := stringify(t.Field(i).Type)
 			if _, ok := m[key]; ok {
-				return nil, fmt.Errorf("interface conflict: %s", key)
+				return nil, fmt.Errorf("interface conflict in %s: %s", t.Name(), key)
 			}
 			m[key] = struct{}{}
 		}
