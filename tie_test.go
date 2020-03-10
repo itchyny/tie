@@ -167,6 +167,27 @@ func TestBuilderCyclic(t *testing.T) {
 	}
 }
 
+type x4 struct {
+	y *y4
+}
+
+func (x *x4) FooX() int { return x.y.FooY() }
+
+type y4 struct{}
+
+func (*y4) FooY() int { return 42 }
+
+func TestBuilderStructPtr(t *testing.T) {
+	got, err := New(&x4{}).With(&y4{}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x4)
+	if got, expected := x.FooX(), 42; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 type xConflict struct {
 	y, z Y1
 }
