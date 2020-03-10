@@ -20,6 +20,10 @@ type z1 struct{}
 
 func (z *z1) FooZ() {}
 
+type w1 struct{}
+
+func (w *w1) FooY() int { return 24 }
+
 func TestBuilder(t *testing.T) {
 	got, err := New(&x1{}).With(&y1{}).Build()
 	if err != nil {
@@ -27,6 +31,17 @@ func TestBuilder(t *testing.T) {
 	}
 	x := got.(*x1)
 	if got, expected := x.FooX(), 42; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderOverwrite(t *testing.T) {
+	got, err := New(&x1{}).With(&y1{}).With(&w1{}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x1)
+	if got, expected := x.FooX(), 24; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
