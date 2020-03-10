@@ -36,3 +36,17 @@ func TestBuilderDependencyNotEnoughError(t *testing.T) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
+
+type xConflict struct {
+	y, z Y1
+}
+
+func TestBuilderInterfaceConflictError(t *testing.T) {
+	_, err := New(&xConflict{}).Build()
+	if err == nil {
+		t.Errorf("expected error but got nil")
+	}
+	if got, expected := err.Error(), "interface conflict: github.com/itchyny/tie.Y1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}

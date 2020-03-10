@@ -38,6 +38,15 @@ func (b *builder) With(v interface{}) Builder {
 }
 
 func (b *builder) Build() (interface{}, error) {
+	m := make(map[string]struct{}, b.vType.NumField())
+	for i := 0; i < b.vType.NumField(); i++ {
+		t := b.vType.Field(i).Type
+		key := t.PkgPath() + "." + t.Name()
+		if _, ok := m[key]; ok {
+			return nil, fmt.Errorf("interface conflict: %s", key)
+		}
+		m[key] = struct{}{}
+	}
 	for i := 0; i < b.vType.NumField(); i++ {
 		if b.vValue.Elem().Field(i).Kind() == reflect.Interface && b.vValue.Elem().Field(i).IsNil() {
 			return nil, fmt.Errorf("dependency not enough: %s#%s", b.vType.Name(), b.vType.Field(i).Name)
