@@ -13,12 +13,12 @@ type Builder interface {
 	MustBuild() interface{}
 }
 
-type builder []interface{}
-
 // New creates a new Builder.
 func New(v interface{}) Builder {
 	return builder{v}
 }
+
+type builder []interface{}
 
 func (b builder) With(v interface{}) Builder {
 	return append(b, v)
