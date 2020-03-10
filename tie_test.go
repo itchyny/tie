@@ -51,16 +51,6 @@ func TestBuilderUnusedComponentError(t *testing.T) {
 	}
 }
 
-func TestBuilderUnusedComponentError2(t *testing.T) {
-	_, err := New(&x1{}).With(&y1{}).With(z1{}).Build()
-	if err == nil {
-		t.Fatal("expected error but got nil")
-	}
-	if got, expected := err.Error(), "unused component: github.com/itchyny/tie.z1"; got != expected {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
-
 type x2 struct {
 	y Y2
 	z Z2
@@ -112,12 +102,67 @@ func TestBuilderDiamond(t *testing.T) {
 	}
 }
 
+func TestBuilderDiamond2(t *testing.T) {
+	got, err := New(&x2{}).With(&w2{24}).With(&y2{}).With(&z2{}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x2)
+	if got, expected := x.FooX(), 51; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 func TestBuilderDiamondDependencyNotEnoughError(t *testing.T) {
 	_, err := New(&x2{}).With(&y2{}).With(&z2{}).Build()
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
 	if got, expected := err.Error(), "dependency not enough: y2#w"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+type x3 struct {
+	y Y3
+	z Z3
+}
+
+func (x *x3) FooX() int { return x.y.FooY1() + x.z.FooZ1() }
+
+type Y3 interface {
+	FooY1() int
+	FooY2() int
+}
+
+type Z3 interface {
+	FooZ1() int
+	FooZ2() int
+}
+
+type y3 struct {
+	z Z3
+}
+
+func (y *y3) FooY1() int { return y.z.FooZ2() }
+
+func (y *y3) FooY2() int { return 12 }
+
+type z3 struct {
+	y Y3
+}
+
+func (z *z3) FooZ1() int { return z.y.FooY2() }
+
+func (z *z3) FooZ2() int { return 18 }
+
+func TestBuilderCyclic(t *testing.T) {
+	got, err := New(&x3{}).With(&y3{}).With(&z3{}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x3)
+	if got, expected := x.FooX(), 30; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

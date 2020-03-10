@@ -14,23 +14,33 @@ type Builder interface {
 }
 
 type builder struct {
-	value    interface{}
+	values   []interface{}
+	unused   []bool
 	rv       reflect.Value
 	rt       reflect.Type
 	builders []*builder
-	unused   reflect.Type
 }
 
 // New creates a new Builder.
 func New(v interface{}) Builder {
-	rv := reflect.ValueOf(v)
-	return &builder{value: v, rv: rv, rt: rv.Type().Elem()}
+	return &builder{
+		values: []interface{}{v},
+		unused: []bool{false},
+		rv:     reflect.ValueOf(v),
+		rt:     reflect.TypeOf(v).Elem(),
+	}
 }
 
 func (b *builder) With(v interface{}) Builder {
-	if _, ok := b.with(v); !ok {
-		b.unused = reflect.TypeOf(v)
+	c := New(v).(*builder)
+	for i, w := range b.values {
+		if _, ok := c.with(w); ok {
+			b.unused[i] = false
+		}
 	}
+	b.values = append(b.values, v)
+	_, ok := b.with(v)
+	b.unused = append(b.unused, !ok)
 	return b
 }
 
@@ -55,8 +65,10 @@ func (b *builder) with(v interface{}) (Builder, bool) {
 }
 
 func (b *builder) Build() (interface{}, error) {
-	if t := b.unused; t != nil {
-		return nil, fmt.Errorf("unused component: %s", stringify(t))
+	for i, unused := range b.unused {
+		if unused {
+			return nil, fmt.Errorf("unused component: %s", stringify(reflect.TypeOf(b.values[i])))
+		}
 	}
 	return b.build()
 }
@@ -81,7 +93,7 @@ func (b *builder) build() (interface{}, error) {
 			return nil, err
 		}
 	}
-	return b.value, nil
+	return b.values[0], nil
 }
 
 func (b *builder) MustBuild() interface{} {
