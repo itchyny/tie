@@ -48,7 +48,7 @@ func (b builder) Build() (interface{}, error) {
 		for j, w := range vs {
 			u := ts[j]
 			for k := 0; k < u.NumField(); k++ {
-				if t.ConvertibleTo(u.Field(k).Type) {
+				if t.AssignableTo(u.Field(k).Type) {
 					w := w.Elem().Field(k)
 					reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(v)
 					unused[i] = false
