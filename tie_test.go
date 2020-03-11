@@ -66,6 +66,26 @@ func TestBuilderUnusedComponentError(t *testing.T) {
 	}
 }
 
+func TestBuilderStructError(t *testing.T) {
+	_, err := New(&x1{}).With(y1{}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "not a struct pointer: github.com/itchyny/tie.y1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderStructError2(t *testing.T) {
+	_, err := New(&x1{}).With(new(int)).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "not a struct pointer: int"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 type x2 struct {
 	y Y2
 	z Z2

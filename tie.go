@@ -31,7 +31,17 @@ func (b builder) Build() (interface{}, error) {
 	for i, v := range b {
 		unused[i] = true
 		vs[i] = reflect.ValueOf(v)
-		ts[i] = reflect.TypeOf(v).Elem()
+		switch t := reflect.TypeOf(v); t.Kind() {
+		case reflect.Ptr:
+			switch t := t.Elem(); t.Kind() {
+			case reflect.Struct:
+				ts[i] = t
+			default:
+				return nil, fmt.Errorf("not a struct pointer: %s", stringify(t))
+			}
+		default:
+			return nil, fmt.Errorf("not a struct pointer: %s", stringify(t))
+		}
 	}
 	for _, t := range ts {
 		m := make(map[string]struct{}, t.NumField())
@@ -84,6 +94,9 @@ func (b builder) MustBuild() interface{} {
 func stringify(t reflect.Type) string {
 	if t.Kind() == reflect.Ptr {
 		return stringify(t.Elem())
+	}
+	if t.PkgPath() == "" {
+		return t.Name()
 	}
 	return t.PkgPath() + "." + t.Name()
 }
