@@ -45,19 +45,28 @@ func (b builder) Build() (interface{}, error) {
 				return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
 			}
 		case reflect.Func:
-			if t.NumOut() != 1 {
-				return nil, fmt.Errorf("unexpected number of return values: %s", stringify(t))
-			}
-			fs[i] = t
-			switch t := t.Out(0); t.Kind() {
-			case reflect.Ptr:
-				ts[i] = t
-				switch t := t.Elem(); t.Kind() {
-				case reflect.Struct:
+			switch t.NumOut() {
+			case 2:
+				if !t.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+					return nil, fmt.Errorf("second return value is not an error: %s", stringify(t))
+				}
+				fallthrough
+			case 1:
+				switch t := t.Out(0); t.Kind() {
+				case reflect.Ptr:
+					ts[i] = t
+					switch t := t.Elem(); t.Kind() {
+					case reflect.Struct:
+					default:
+						return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
+					}
 				default:
 					return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
 				}
+			default:
+				return nil, fmt.Errorf("unexpected number of return values: %s", stringify(t))
 			}
+			fs[i] = t
 		default:
 			return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
 		}
@@ -127,7 +136,11 @@ func (b builder) Build() (interface{}, error) {
 					}
 				}
 			}
-			vs[i] = reflect.ValueOf(b[i]).Call(args)[0]
+			ys := reflect.ValueOf(b[i]).Call(args)
+			if len(ys) == 2 && !ys[1].IsNil() {
+				return nil, ys[1].Interface().(error)
+			}
+			vs[i] = ys[0]
 		}
 	}
 

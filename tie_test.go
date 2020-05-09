@@ -1,6 +1,9 @@
 package tie
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 type x1 struct {
 	y Y1
@@ -149,6 +152,8 @@ type x2 struct {
 
 func newX2(y Y2, z Z2) *x2 { return &x2{y, z} }
 
+func newX2E(y Y2, z Z2) (*x2, error) { return &x2{y, z}, nil }
+
 func (x *x2) FooX() int { return x.y.FooY() + x.z.FooZ() }
 
 type Y2 interface {
@@ -169,6 +174,8 @@ type y2 struct {
 
 func newY2(w W2) *y2 { return &y2{w} }
 
+func newY2E(w W2) (*y2, error) { return &y2{w}, nil }
+
 func (y *y2) FooY() int { return y.w.FooW() }
 
 type z2 struct {
@@ -177,6 +184,8 @@ type z2 struct {
 
 func newZ2(w W2) *z2 { return &z2{w} }
 
+func newZ2E(w W2) (*z2, error) { return &z2{w}, nil }
+
 func (z *z2) FooZ() int { return z.w.FooW() }
 
 type w2 struct {
@@ -184,6 +193,8 @@ type w2 struct {
 }
 
 func newW2() *w2 { return &w2{} }
+
+func newW2E() (*w2, error) { return &w2{}, nil }
 
 func (w *w2) FooW() int {
 	w.v++
@@ -229,6 +240,50 @@ func TestBuilderFuncDiamond(t *testing.T) {
 	}
 	x := got.(*x2)
 	if got, expected := x.FooX(), 3; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncError(t *testing.T) {
+	got, err := New(newX2E).With(newY2E).With(newZ2E).With(newW2E).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x2)
+	if got, expected := x.FooX(), 3; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncError2(t *testing.T) {
+	_, err := New(newX2E).With(newY2E).With(newZ2E).
+		With(func() (*w2, error) { return nil, errors.New("error") }).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "error"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncError3(t *testing.T) {
+	_, err := New(newX2E).With(newY2E).With(newZ2E).
+		With(func() (*w2, int) { return nil, 1 }).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "second return value is not an error: func() (*tie.w2, int)"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncError4(t *testing.T) {
+	_, err := New(newX2E).With(newY2E).With(newZ2E).
+		With(func() (int, error) { return 1, nil }).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "not a struct pointer nor a func: int"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
