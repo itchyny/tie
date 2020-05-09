@@ -25,9 +25,10 @@ func (b builder) With(v interface{}) Builder {
 }
 
 func (b builder) Build() (interface{}, error) {
-	unused := make([]bool, len(b))
-	vs := make([]reflect.Value, len(b))
-	ts := make([]reflect.Type, len(b))
+	n := len(b)
+	unused := make([]bool, n)
+	vs := make([]reflect.Value, n)
+	ts := make([]reflect.Type, n)
 	for i, v := range b {
 		unused[i] = true
 		vs[i] = reflect.ValueOf(v)
@@ -53,7 +54,7 @@ func (b builder) Build() (interface{}, error) {
 			m[key] = struct{}{}
 		}
 	}
-	for i := 1; i < len(b); i++ {
+	for i := 1; i < n; i++ {
 		v, t := vs[i], reflect.TypeOf(b[i])
 		for j, w := range vs {
 			u := ts[j]
@@ -67,7 +68,7 @@ func (b builder) Build() (interface{}, error) {
 			}
 		}
 	}
-	for i := 1; i < len(b); i++ {
+	for i := 1; i < n; i++ {
 		if unused[i] {
 			return nil, fmt.Errorf("unused component: %s", stringify(ts[i]))
 		}
