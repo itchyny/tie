@@ -31,6 +31,8 @@ func (b builder) Build() (interface{}, error) {
 	vs := make([]reflect.Value, n)
 	ts := make([]reflect.Type, n)
 	fs := make([]reflect.Type, n)
+
+	// validate and collect types
 	for i, v := range b {
 		unused[i] = true
 		switch t := reflect.TypeOf(v); t.Kind() {
@@ -60,6 +62,8 @@ func (b builder) Build() (interface{}, error) {
 			return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
 		}
 	}
+
+	// check duplicate interface in each struct just in case
 	for _, t := range ts {
 		m := make(map[string]struct{}, t.Elem().NumField())
 		for i := 0; i < t.Elem().NumField(); i++ {
@@ -70,6 +74,8 @@ func (b builder) Build() (interface{}, error) {
 			m[key] = struct{}{}
 		}
 	}
+
+	// check function arguments and build dependency adjacent matrix
 	xs := make([]bool, n*n)
 	adj := make([][]bool, n)
 	for i := 0; i < n; i++ {
@@ -101,10 +107,14 @@ func (b builder) Build() (interface{}, error) {
 			}
 		}
 	}
+
+	// topological sort
 	ls, err := tsort(n, adj)
 	if err != nil {
 		return nil, err
 	}
+
+	// initialize function dependencies
 	for _, i := range ls {
 		if u := fs[i]; u != nil {
 			args := make([]reflect.Value, u.NumIn())
@@ -120,6 +130,8 @@ func (b builder) Build() (interface{}, error) {
 			vs[i] = reflect.ValueOf(b[i]).Call(args)[0]
 		}
 	}
+
+	// fill in struct fields
 	for i := 1; i < n; i++ {
 		v, t := vs[i], ts[i]
 		for j, w := range vs {
@@ -134,11 +146,15 @@ func (b builder) Build() (interface{}, error) {
 			}
 		}
 	}
+
+	// check unused components
 	for i := 1; i < n; i++ {
 		if unused[i] {
 			return nil, fmt.Errorf("unused component: %s", stringify(ts[i]))
 		}
 	}
+
+	// check not enough dependency
 	for i, v := range vs {
 		t := ts[i]
 		for i := 0; i < t.Elem().NumField(); i++ {
