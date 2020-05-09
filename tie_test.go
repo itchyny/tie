@@ -6,9 +6,13 @@ type x1 struct {
 	y Y1
 }
 
+func newX1(y Y1) *x1 { return &x1{y} }
+
 func (x *x1) FooX() int { return x.y.FooY() }
 
 type y1 struct{}
+
+func newY1() *y1 { return &y1{} }
 
 func (*y1) FooY() int { return 42 }
 
@@ -46,6 +50,28 @@ func TestBuilderOverwrite(t *testing.T) {
 	}
 }
 
+func TestBuilderFunc(t *testing.T) {
+	got, err := New(newX1).With(newY1).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x1)
+	if got, expected := x.FooX(), 42; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncMixed(t *testing.T) {
+	got, err := New(newX1).With(&y1{}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x1)
+	if got, expected := x.FooX(), 42; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 func TestBuilderDependencyNotEnoughError(t *testing.T) {
 	_, err := New(&x1{}).Build()
 	if err == nil {
@@ -71,7 +97,7 @@ func TestBuilderStructError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "not a struct pointer: github.com/itchyny/tie.y1"; got != expected {
+	if got, expected := err.Error(), "not a struct pointer nor a func: github.com/itchyny/tie.y1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -81,7 +107,37 @@ func TestBuilderStructError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "not a struct pointer: int"; got != expected {
+	if got, expected := err.Error(), "not a struct pointer nor a func: int"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncDependency(t *testing.T) {
+	_, err := New(newX1).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "dependency not enough: github.com/itchyny/tie.Y1 for func(tie.Y1) *tie.x1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncArgs(t *testing.T) {
+	_, err := New(func(int) *x1 { return nil }).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "not a struct pointer nor an interface: int for func(int) *tie.x1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncReturnValues(t *testing.T) {
+	_, err := New(func() {}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "unexpected number of return values: func()"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -90,6 +146,8 @@ type x2 struct {
 	y Y2
 	z Z2
 }
+
+func newX2(y Y2, z Z2) *x2 { return &x2{y, z} }
 
 func (x *x2) FooX() int { return x.y.FooY() + x.z.FooZ() }
 
@@ -109,17 +167,23 @@ type y2 struct {
 	w W2
 }
 
+func newY2(w W2) *y2 { return &y2{w} }
+
 func (y *y2) FooY() int { return y.w.FooW() }
 
 type z2 struct {
 	w W2
 }
 
+func newZ2(w W2) *z2 { return &z2{w} }
+
 func (z *z2) FooZ() int { return z.w.FooW() }
 
 type w2 struct {
 	v int
 }
+
+func newW2() *w2 { return &w2{} }
 
 func (w *w2) FooW() int {
 	w.v++
@@ -158,10 +222,23 @@ func TestBuilderDiamondDependencyNotEnoughError(t *testing.T) {
 	}
 }
 
+func TestBuilderFuncDiamond(t *testing.T) {
+	got, err := New(newX2).With(newY2).With(newZ2).With(newW2).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := got.(*x2)
+	if got, expected := x.FooX(), 3; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
 type x3 struct {
 	y Y3
 	z Z3
 }
+
+func newX3(y Y3, z Z3) *x3 { return &x3{y, z} }
 
 func (x *x3) FooX() int { return x.y.FooY1() + x.z.FooZ1() }
 
@@ -179,6 +256,8 @@ type y3 struct {
 	z Z3
 }
 
+func newY3(z Z3) *y3 { return &y3{z} }
+
 func (y *y3) FooY1() int { return y.z.FooZ2() }
 
 func (y *y3) FooY2() int { return 12 }
@@ -186,6 +265,8 @@ func (y *y3) FooY2() int { return 12 }
 type z3 struct {
 	y Y3
 }
+
+func newZ3(y Y3) *z3 { return &z3{y} }
 
 func (z *z3) FooZ1() int { return z.y.FooY2() }
 
@@ -198,6 +279,16 @@ func TestBuilderCyclic(t *testing.T) {
 	}
 	x := got.(*x3)
 	if got, expected := x.FooX(), 30; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncCyclicError(t *testing.T) {
+	_, err := New(newX3).With(newY3).With(newZ3).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "dependency has a cycle"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -229,6 +320,16 @@ type xConflict struct {
 
 func TestBuilderInterfaceConflictError(t *testing.T) {
 	_, err := New(&xConflict{}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "interface conflict in xConflict: github.com/itchyny/tie.Y1"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncInterfaceConflictError(t *testing.T) {
+	_, err := New(func() *xConflict { return &xConflict{} }).Build()
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}

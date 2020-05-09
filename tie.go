@@ -1,6 +1,7 @@
 package tie
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"unsafe"
@@ -29,37 +30,102 @@ func (b builder) Build() (interface{}, error) {
 	unused := make([]bool, n)
 	vs := make([]reflect.Value, n)
 	ts := make([]reflect.Type, n)
+	fs := make([]reflect.Type, n)
 	for i, v := range b {
 		unused[i] = true
-		vs[i] = reflect.ValueOf(v)
 		switch t := reflect.TypeOf(v); t.Kind() {
 		case reflect.Ptr:
+			ts[i] = t
 			switch t := t.Elem(); t.Kind() {
 			case reflect.Struct:
-				ts[i] = t
+				vs[i] = reflect.ValueOf(v)
 			default:
-				return nil, fmt.Errorf("not a struct pointer: %s", stringify(t))
+				return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
+			}
+		case reflect.Func:
+			if t.NumOut() != 1 {
+				return nil, fmt.Errorf("unexpected number of return values: %s", stringify(t))
+			}
+			fs[i] = t
+			switch t := t.Out(0); t.Kind() {
+			case reflect.Ptr:
+				ts[i] = t
+				switch t := t.Elem(); t.Kind() {
+				case reflect.Struct:
+				default:
+					return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
+				}
 			}
 		default:
-			return nil, fmt.Errorf("not a struct pointer: %s", stringify(t))
+			return nil, fmt.Errorf("not a struct pointer nor a func: %s", stringify(t))
 		}
 	}
 	for _, t := range ts {
-		m := make(map[string]struct{}, t.NumField())
-		for i := 0; i < t.NumField(); i++ {
-			key := stringify(t.Field(i).Type)
+		m := make(map[string]struct{}, t.Elem().NumField())
+		for i := 0; i < t.Elem().NumField(); i++ {
+			key := stringify(t.Elem().Field(i).Type)
 			if _, ok := m[key]; ok {
-				return nil, fmt.Errorf("interface conflict in %s: %s", t.Name(), key)
+				return nil, fmt.Errorf("interface conflict in %s: %s", t.Elem().Name(), key)
 			}
 			m[key] = struct{}{}
 		}
 	}
+	xs := make([]bool, n*n)
+	adj := make([][]bool, n)
+	for i := 0; i < n; i++ {
+		adj[i] = xs[i*n : (i+1)*n]
+	}
+	for i, u := range fs {
+		if u != nil {
+			for j := 0; j < u.NumIn(); j++ {
+				u := u.In(j)
+				switch u.Kind() {
+				case reflect.Interface:
+				case reflect.Ptr:
+					if u.Elem().Kind() != reflect.Struct {
+						return nil, fmt.Errorf("not a struct pointer nor an interface: %s for %s", stringify(u), stringify(fs[i]))
+					}
+				default:
+					return nil, fmt.Errorf("not a struct pointer nor an interface: %s for %s", stringify(u), stringify(fs[i]))
+				}
+				var found bool
+				for k, t := range ts {
+					if t.AssignableTo(u) {
+						adj[k][i] = true
+						found = true
+					}
+				}
+				if !found {
+					return nil, fmt.Errorf("dependency not enough: %s for %s", stringify(u), stringify(fs[i]))
+				}
+			}
+		}
+	}
+	ls, err := tsort(n, adj)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range ls {
+		if u := fs[i]; u != nil {
+			args := make([]reflect.Value, u.NumIn())
+			for j := 0; j < u.NumIn(); j++ {
+				u := u.In(j)
+				for k, t := range ts {
+					if t.AssignableTo(u) {
+						args[j] = vs[k]
+						unused[k] = false
+					}
+				}
+			}
+			vs[i] = reflect.ValueOf(b[i]).Call(args)[0]
+		}
+	}
 	for i := 1; i < n; i++ {
-		v, t := vs[i], reflect.TypeOf(b[i])
+		v, t := vs[i], ts[i]
 		for j, w := range vs {
 			u := ts[j]
-			for k := 0; k < u.NumField(); k++ {
-				if t.AssignableTo(u.Field(k).Type) {
+			for k := 0; k < u.Elem().NumField(); k++ {
+				if t.AssignableTo(u.Elem().Field(k).Type) {
 					w := w.Elem().Field(k)
 					reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(v)
 					unused[i] = false
@@ -75,13 +141,13 @@ func (b builder) Build() (interface{}, error) {
 	}
 	for i, v := range vs {
 		t := ts[i]
-		for i := 0; i < t.NumField(); i++ {
+		for i := 0; i < t.Elem().NumField(); i++ {
 			if v.Elem().Field(i).Kind() == reflect.Interface && v.Elem().Field(i).IsNil() {
-				return nil, fmt.Errorf("dependency not enough: %s#%s", t.Name(), t.Field(i).Name)
+				return nil, fmt.Errorf("dependency not enough: %s#%s", t.Elem().Name(), t.Elem().Field(i).Name)
 			}
 		}
 	}
-	return b[0], nil
+	return vs[0].Interface(), nil
 }
 
 func (b builder) MustBuild() interface{} {
@@ -93,11 +159,52 @@ func (b builder) MustBuild() interface{} {
 }
 
 func stringify(t reflect.Type) string {
-	if t.Kind() == reflect.Ptr {
+	switch t.Kind() {
+	case reflect.Ptr:
 		return stringify(t.Elem())
+	case reflect.Func:
+		return fmt.Sprint(t)
 	}
 	if t.PkgPath() == "" {
 		return t.Name()
 	}
 	return t.PkgPath() + "." + t.Name()
+}
+
+func tsort(n int, adj [][]bool) ([]int, error) {
+	ts := make([]int, 0, n)
+	qs := make([]int, 0, n)
+	vs := make([]bool, n)
+	deg := make([]int, n)
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			if adj[i][j] {
+				deg[j]++
+			}
+		}
+	}
+	for i := 0; i < n; i++ {
+		if deg[i] == 0 {
+			qs = append(qs, i)
+			vs[i] = true
+		}
+	}
+	if len(qs) == 0 && n > 0 {
+		return nil, errors.New("dependency has a cycle")
+	}
+	var x int
+	for len(qs) > 0 {
+		x, qs = qs[0], qs[1:]
+		ts = append(ts, x)
+		for i := 0; i < n; i++ {
+			if adj[x][i] && !vs[i] {
+				deg[i]--
+				if deg[i] == 0 {
+					qs = append(qs, i)
+					vs[i] = true
+				}
+			}
+		}
+	}
+	return ts, nil
 }
