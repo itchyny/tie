@@ -283,7 +283,7 @@ func TestBuilderFuncError4(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "not a struct pointer nor a func: int"; got != expected {
+	if got, expected := err.Error(), "not a struct pointer: int in func() (int, error)"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
