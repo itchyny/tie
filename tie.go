@@ -7,25 +7,21 @@ import (
 	"unsafe"
 )
 
-// Builder ...
-type Builder interface {
-	With(interface{}) Builder
-	Build() (interface{}, error)
-	MustBuild() interface{}
-}
+// Builder is the dependency resolving builder.
+type Builder []interface{}
 
 // New creates a new Builder.
 func New(v interface{}) Builder {
-	return builder{v}
+	return Builder{v}
 }
 
-type builder []interface{}
-
-func (b builder) With(v interface{}) Builder {
+// With appends a new component.
+func (b Builder) With(v interface{}) Builder {
 	return append(b, v)
 }
 
-func (b builder) Build() (interface{}, error) {
+// Build the components.
+func (b Builder) Build() (interface{}, error) {
 	n := len(b)
 	unused := make([]bool, n)
 	vs := make([]reflect.Value, n)
@@ -179,7 +175,8 @@ func (b builder) Build() (interface{}, error) {
 	return vs[0].Interface(), nil
 }
 
-func (b builder) MustBuild() interface{} {
+// MustBuild builds the components and panic on error.
+func (b Builder) MustBuild() interface{} {
 	v, err := b.Build()
 	if err != nil {
 		panic(err)
