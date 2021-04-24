@@ -60,18 +60,6 @@ func (b Builder) Build() (interface{}, error) {
 		}
 	}
 
-	// check duplicate interface in each struct just in case
-	for _, t := range types {
-		m := make(map[string]struct{}, t.Elem().NumField())
-		for i := 0; i < t.Elem().NumField(); i++ {
-			key := stringify(t.Elem().Field(i).Type)
-			if _, ok := m[key]; ok {
-				return nil, fmt.Errorf("interface conflict in %s: %s", t.Elem().Name(), key)
-			}
-			m[key] = struct{}{}
-		}
-	}
-
 	// check function arguments and build dependency adjacent matrix
 	xs := make([]bool, n*n)
 	adj := make([][]bool, n)
