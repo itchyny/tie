@@ -327,6 +327,14 @@ func (z *z3) FooZ1() int { return z.y.FooY2() }
 
 func (z *z3) FooZ2() int { return 18 }
 
+type v3 struct{}
+
+func newV3() *v3 { return &v3{} }
+
+type w3 struct{}
+
+func newW3(w *w3) *w3 { return w }
+
 func TestBuilderCyclic(t *testing.T) {
 	got, err := New(&x3{}).With(&y3{}).With(&z3{}).Build()
 	if err != nil {
@@ -340,6 +348,16 @@ func TestBuilderCyclic(t *testing.T) {
 
 func TestBuilderFuncCyclicError(t *testing.T) {
 	_, err := New(newX3).With(newY3).With(newZ3).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "dependency has a cycle"; got != expected {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestBuilderFuncCyclicError2(t *testing.T) {
+	_, err := New(newV3).With(newW3).Build()
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}

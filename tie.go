@@ -192,9 +192,6 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 			vs[i] = true
 		}
 	}
-	if len(qs) == 0 && n > 0 {
-		return nil, errors.New("dependency has a cycle")
-	}
 	var x int
 	for len(qs) > 0 {
 		x, qs = qs[0], qs[1:]
@@ -208,6 +205,9 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 				}
 			}
 		}
+	}
+	if len(ts) < n {
+		return nil, errors.New("dependency has a cycle")
 	}
 	return ts, nil
 }
