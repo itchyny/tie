@@ -3,6 +3,7 @@ package tie
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"unsafe"
@@ -189,14 +190,14 @@ func (b Builder) MustBuild() interface{} {
 func stringify(t reflect.Type) string {
 	switch t.Kind() {
 	case reflect.Ptr:
-		return stringify(t.Elem())
+		return "*" + stringify(t.Elem())
 	case reflect.Func:
 		return fmt.Sprint(t)
 	}
 	if t.PkgPath() == "" {
 		return t.Name()
 	}
-	return t.PkgPath() + "." + t.Name()
+	return filepath.Base(t.PkgPath()) + "." + t.Name()
 }
 
 func tsort(n int, adj [][]bool) ([]int, error) {

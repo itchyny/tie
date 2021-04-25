@@ -91,7 +91,7 @@ func TestBuilderUnusedComponentError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "unused component: github.com/itchyny/tie.z1"; got != expected {
+	if got, expected := err.Error(), "unused component: *tie.z1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -101,7 +101,7 @@ func TestBuilderStructError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "not a struct pointer nor a func: github.com/itchyny/tie.y1"; got != expected {
+	if got, expected := err.Error(), "not a struct pointer nor a func: tie.y1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -111,7 +111,7 @@ func TestBuilderStructError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "not a struct pointer nor a func: int"; got != expected {
+	if got, expected := err.Error(), "not a struct pointer nor a func: *int"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -121,7 +121,7 @@ func TestBuilderFuncDependency(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "dependency not enough: github.com/itchyny/tie.Y1 for func(tie.Y1) *tie.x1"; got != expected {
+	if got, expected := err.Error(), "dependency not enough: tie.Y1 for func(tie.Y1) *tie.x1"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
