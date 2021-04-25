@@ -269,9 +269,9 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 		i := ps[len(ps)-1]
 		for j := 0; j < n; j++ {
 			if !vs[j] && adj[i][j] {
-				for _, l := range ps {
+				for k, l := range ps {
 					if j == l {
-						return nil, cycleError(append(ps, j))
+						return nil, cycleError(append(ps[k:], j))
 					}
 				}
 				pss = append(pss, append(ps, j))
