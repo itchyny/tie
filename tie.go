@@ -28,11 +28,10 @@ func (b Builder) Build() (interface{}, error) {
 	values := make([]reflect.Value, n)
 	types := make([]reflect.Type, n)
 	funcs := make([]reflect.Type, n)
-	unused := make([]bool, n)
+	used := make([]bool, n)
 
 	// validate and collect types
 	for i, v := range b {
-		unused[i] = true
 		switch t := reflect.TypeOf(v); t.Kind() {
 		case reflect.Ptr:
 			if t.Elem().Kind() != reflect.Struct {
@@ -155,7 +154,7 @@ func (b Builder) Build() (interface{}, error) {
 					if adj[ls[k]][l] && types[ls[k]].AssignableTo(u) {
 						w := v.Elem().Field(j)
 						reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(values[ls[k]])
-						unused[ls[k]] = false
+						used[ls[k]] = true
 						break
 					}
 				}
@@ -167,7 +166,7 @@ func (b Builder) Build() (interface{}, error) {
 				for k := 0; k < i; k++ {
 					if adj[ls[k]][l] && types[ls[k]].AssignableTo(u) {
 						args[j] = values[ls[k]]
-						unused[ls[k]] = false
+						used[ls[k]] = true
 						break
 					}
 				}
@@ -182,7 +181,7 @@ func (b Builder) Build() (interface{}, error) {
 
 	// check unused components
 	for i := 1; i < n; i++ {
-		if unused[i] {
+		if !used[i] {
 			return nil, fmt.Errorf("unused component: %s", stringify(types[i]))
 		}
 	}
