@@ -105,11 +105,10 @@ func (b Builder) Build() (interface{}, error) {
 		if err, ok := err.(cycleError); ok {
 			var sb strings.Builder
 			sb.WriteString(err.Error())
-			sb.WriteString(":\n")
 			var prev int
 			for i, k := range []int(err) {
 				if i == 0 {
-					sb.WriteString("  ")
+					sb.WriteString(":\n  ")
 					if funcs[k] == nil {
 						sb.WriteString(stringify(types[k]))
 					} else {
