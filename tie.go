@@ -146,40 +146,38 @@ func (b Builder) Build() (interface{}, error) {
 		return nil, err
 	}
 
-	// initialize function dependencies
-	for _, i := range ls {
-		if u := funcs[i]; u != nil {
-			args := make([]reflect.Value, u.NumIn())
-			for j := 0; j < u.NumIn(); j++ {
-				u := u.In(j)
-				for k, t := range types {
-					if t.AssignableTo(u) {
-						args[j] = values[k]
-						unused[k] = false
+	// initialize function dependencies and fill in struct fields
+	for i, l := range ls {
+		if u := funcs[l]; u == nil {
+			v, t := values[l], types[l].Elem()
+			for j := 0; j < t.NumField(); j++ {
+				u := t.Field(j).Type
+				for k := 0; k < i; k++ {
+					if types[ls[k]].AssignableTo(u) {
+						w := v.Elem().Field(j)
+						reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(values[ls[k]])
+						unused[ls[k]] = false
+						break
 					}
 				}
 			}
-			ys := reflect.ValueOf(b[i]).Call(args)
+		} else {
+			args := make([]reflect.Value, u.NumIn())
+			for j := 0; j < u.NumIn(); j++ {
+				u := u.In(j)
+				for k := 0; k < i; k++ {
+					if types[ls[k]].AssignableTo(u) {
+						args[j] = values[ls[k]]
+						unused[ls[k]] = false
+						break
+					}
+				}
+			}
+			ys := reflect.ValueOf(b[l]).Call(args)
 			if len(ys) == 2 && !ys[1].IsNil() {
 				return nil, ys[1].Interface().(error)
 			}
-			values[i] = ys[0]
-		}
-	}
-
-	// fill in struct fields
-	for i := 1; i < n; i++ {
-		v, t := values[i], types[i]
-		for j, w := range values {
-			u := types[j].Elem()
-			for k := 0; k < u.NumField(); k++ {
-				if t.AssignableTo(u.Field(k).Type) {
-					w := w.Elem().Field(k)
-					reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(v)
-					unused[i] = false
-					break
-				}
-			}
+			values[l] = ys[0]
 		}
 	}
 

@@ -43,17 +43,6 @@ func TestBuilder(t *testing.T) {
 	}
 }
 
-func TestBuilderOverwrite(t *testing.T) {
-	got, err := New(&x1{}).With(&y1{}).With(&w1{}).Build()
-	if err != nil {
-		t.Fatal(err)
-	}
-	x := got.(*x1)
-	if got, expected := x.FooX(), 24; got != expected {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
-
 func TestBuilderFunc(t *testing.T) {
 	got, err := New(newX1).With(newY1).Build()
 	if err != nil {
