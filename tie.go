@@ -153,7 +153,7 @@ func (b Builder) Build() (interface{}, error) {
 			for j := 0; j < t.NumField(); j++ {
 				u := t.Field(j).Type
 				for k := 0; k < i; k++ {
-					if types[ls[k]].AssignableTo(u) {
+					if adj[ls[k]][l] && types[ls[k]].AssignableTo(u) {
 						w := v.Elem().Field(j)
 						reflect.NewAt(w.Type(), unsafe.Pointer(w.UnsafeAddr())).Elem().Set(values[ls[k]])
 						unused[ls[k]] = false
@@ -166,7 +166,7 @@ func (b Builder) Build() (interface{}, error) {
 			for j := 0; j < u.NumIn(); j++ {
 				u := u.In(j)
 				for k := 0; k < i; k++ {
-					if types[ls[k]].AssignableTo(u) {
+					if adj[ls[k]][l] && types[ls[k]].AssignableTo(u) {
 						args[j] = values[ls[k]]
 						unused[ls[k]] = false
 						break
