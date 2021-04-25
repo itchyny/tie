@@ -2,6 +2,7 @@ package tie
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -401,5 +402,168 @@ func TestBuilderStructPtr(t *testing.T) {
 	x := got.(*x4)
 	if got, expected := x.FooX(), 42; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+func TestTsort(t *testing.T) {
+	testCases := []struct {
+		adj      [][]bool
+		expected []int
+		err      error
+	}{
+		{
+			adj:      [][]bool{},
+			expected: []int{},
+		},
+		{
+			adj:      [][]bool{{false}},
+			expected: []int{0},
+		},
+		{
+			adj: [][]bool{{true}},
+			err: cycleError{0, 0},
+		},
+		{
+			adj: [][]bool{
+				{false, false},
+				{false, false},
+			},
+			expected: []int{0, 1},
+		},
+		{
+			adj: [][]bool{
+				{true, false},
+				{false, false},
+			},
+			err: cycleError{0, 0},
+		},
+		{
+			adj: [][]bool{
+				{true, false},
+				{false, true},
+			},
+			err: cycleError{1, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, true},
+				{false, false},
+			},
+			expected: []int{0, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, false},
+				{true, false},
+			},
+			expected: []int{1, 0},
+		},
+		{
+			adj: [][]bool{
+				{false, true},
+				{true, false},
+			},
+			err: cycleError{1, 0, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, true, false},
+				{false, false, false},
+				{true, true, false},
+			},
+			expected: []int{2, 0, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, false, true},
+				{false, false, false},
+				{false, true, false},
+			},
+			expected: []int{0, 2, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, false, true},
+				{true, false, false},
+				{false, true, false},
+			},
+			err: cycleError{2, 1, 0, 2},
+		},
+		{
+			adj: [][]bool{
+				{false, false, false, false},
+				{false, false, false, false},
+				{false, false, false, false},
+				{false, false, false, false},
+			},
+			expected: []int{0, 1, 2, 3},
+		},
+		{
+			adj: [][]bool{
+				{false, true, false, false},
+				{false, false, false, false},
+				{true, false, false, true},
+				{false, true, false, false},
+			},
+			expected: []int{2, 0, 3, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, false, false, true, false},
+				{false, false, true, true, false},
+				{false, false, false, false, false},
+				{false, false, true, false, false},
+				{true, false, true, true, false},
+			},
+			expected: []int{1, 4, 0, 3, 2},
+		},
+		{
+			adj: [][]bool{
+				{false, false, false, true, false},
+				{false, false, false, false, true},
+				{true, false, false, false, false},
+				{false, true, false, false, false},
+				{false, false, true, false, false},
+			},
+			err: cycleError{4, 2, 0, 3, 1, 4},
+		},
+		{
+			adj: [][]bool{
+				{false, false, true, false, true},
+				{false, false, true, false, false},
+				{false, false, false, true, false},
+				{false, true, false, false, true},
+				{false, true, false, false, false},
+			},
+			err: cycleError{1, 2, 3, 1},
+		},
+		{
+			adj: [][]bool{
+				{false, true, false, false, false},
+				{false, false, false, true, false},
+				{false, true, false, true, false},
+				{false, false, false, false, true},
+				{true, false, false, false, false},
+			},
+			err: cycleError{4, 0, 1, 3, 4},
+		},
+	}
+	for _, tc := range testCases {
+		got, err := tsort(len(tc.adj), tc.adj)
+		if err != nil {
+			if tc.err == nil {
+				t.Errorf("got error\nadj: %v\ngot: %v", tc.adj, err)
+			} else if c1, c2 := []int(err.(cycleError)), []int(tc.err.(cycleError)); fmt.Sprint(c1) != fmt.Sprint(c2) {
+				t.Errorf("error mismatch\nadj:      %v\nexpected: %v\ngot:      %v", tc.adj, c2, c1)
+			}
+		} else {
+			if tc.err == nil {
+				if fmt.Sprint(got) != fmt.Sprint(tc.expected) {
+					t.Errorf("result mismatch\nadj:      %v\nexpected: %v\ngot:      %v", tc.adj, tc.expected, got)
+				}
+			} else {
+				t.Errorf("should return an error: %v\nadj: %v", tc.err, tc.adj)
+			}
+		}
 	}
 }
