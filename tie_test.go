@@ -2,6 +2,7 @@ package tie
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -351,7 +352,7 @@ func TestBuilderFuncCyclicError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "dependency has a cycle"; got != expected {
+	if got, expected := err.Error(), "dependency has a cycle"; !strings.Contains(got, expected) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -361,7 +362,33 @@ func TestBuilderFuncCyclicError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "dependency has a cycle"; got != expected {
+	if got, expected := err.Error(), "dependency has a cycle"; !strings.Contains(got, expected) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
+
+type x5 struct{}
+
+func newX5(*y5) *x5 { return &x5{} }
+
+type y5 struct{}
+
+func newY5(*z5) *y5 { return &y5{} }
+
+type z5 struct{}
+
+func newZ5(*w5) *z5 { return &z5{} }
+
+type w5 struct{}
+
+func newW5(*x5) *w5 { return &w5{} }
+
+func TestBuilderFuncCyclicError3(t *testing.T) {
+	_, err := New(newY5).With(newX5).With(newW5).With(newZ5).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+	if got, expected := err.Error(), "dependency has a cycle"; !strings.Contains(got, expected) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

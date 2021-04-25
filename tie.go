@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"unsafe"
 )
 
@@ -91,6 +92,30 @@ func (b Builder) Build() (interface{}, error) {
 	// topological sort
 	ls, err := tsort(n, adj)
 	if err != nil {
+		if err, ok := err.(cycleError); ok {
+			var sb strings.Builder
+			sb.WriteString(err.Error())
+			sb.WriteString(":\n")
+			var prev int
+			for i, k := range []int(err) {
+				if i == 0 {
+					sb.WriteString("  ")
+					sb.WriteString(stringify(funcs[k]))
+				} else {
+					sb.WriteString("\n    -> ")
+					for t, j := funcs[k], 0; j < t.NumIn(); j++ {
+						if types[prev].AssignableTo(t.In(j)) {
+							sb.WriteString(stringify(t.In(j)))
+							break
+						}
+					}
+					sb.WriteString(" for ")
+					sb.WriteString(stringify(funcs[k]))
+				}
+				prev = k
+			}
+			return nil, errors.New(sb.String())
+		}
 		return nil, err
 	}
 
@@ -206,8 +231,35 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 			}
 		}
 	}
-	if len(ts) < n {
-		return nil, errors.New("dependency has a cycle")
+	if len(ts) == n {
+		return ts, nil
 	}
-	return ts, nil
+	var pss [][]int
+	for i := 0; i < n; i++ {
+		if !vs[i] {
+			pss = append(pss, []int{i})
+		}
+	}
+	var ps []int
+	for len(pss) > 0 {
+		ps, pss = pss[len(pss)-1], pss[:len(pss)-1]
+		i := ps[len(ps)-1]
+		for j := 0; j < n; j++ {
+			if !vs[j] && adj[i][j] {
+				for _, l := range ps {
+					if j == l {
+						return nil, cycleError(append(ps, j))
+					}
+				}
+				pss = append(pss, append(ps, j))
+			}
+		}
+	}
+	return nil, cycleError(nil)
+}
+
+type cycleError []int
+
+func (err cycleError) Error() string {
+	return "dependency has a cycle"
 }
