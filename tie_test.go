@@ -336,13 +336,12 @@ type w3 struct{}
 
 func newW3(w *w3) *w3 { return w }
 
-func TestBuilderCyclic(t *testing.T) {
-	got, err := New(&x3{}).With(&y3{}).With(&z3{}).Build()
-	if err != nil {
-		t.Fatal(err)
+func TestBuilderCyclicError(t *testing.T) {
+	_, err := New(&x3{}).With(&y3{}).With(&z3{}).Build()
+	if err == nil {
+		t.Fatal("expected error but got nil")
 	}
-	x := got.(*x3)
-	if got, expected := x.FooX(), 30; got != expected {
+	if got, expected := err.Error(), "dependency has a cycle"; !strings.Contains(got, expected) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

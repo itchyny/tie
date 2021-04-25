@@ -62,7 +62,7 @@ func (b Builder) Build() (interface{}, error) {
 		}
 	}
 
-	// check function arguments and build dependency adjacent matrix
+	// build dependency adjacent matrix
 	xs := make([]bool, n*n)
 	adj := make([][]bool, n)
 	for i := 0; i < n; i++ {
@@ -70,22 +70,31 @@ func (b Builder) Build() (interface{}, error) {
 	}
 	for i, t := range funcs {
 		if t == nil {
-			continue
-		}
-		for j := 0; j < t.NumIn(); j++ {
-			u := t.In(j)
-			if k := u.Kind(); !(k == reflect.Ptr && u.Elem().Kind() == reflect.Struct || k == reflect.Interface) {
-				return nil, fmt.Errorf("not a struct pointer nor an interface: %s for %s", stringify(u), stringify(t))
-			}
-			var found bool
-			for k, t := range types {
-				if t.AssignableTo(u) {
-					adj[k][i] = true
-					found = true
+			t = types[i].Elem()
+			for j := 0; j < t.NumField(); j++ {
+				u := t.Field(j).Type
+				for k, t := range types {
+					if t.AssignableTo(u) {
+						adj[k][i] = true
+					}
 				}
 			}
-			if !found {
-				return nil, fmt.Errorf("dependency not enough: %s for %s", stringify(u), stringify(t))
+		} else {
+			for j := 0; j < t.NumIn(); j++ {
+				u := t.In(j)
+				if k := u.Kind(); !(k == reflect.Ptr && u.Elem().Kind() == reflect.Struct || k == reflect.Interface) {
+					return nil, fmt.Errorf("not a struct pointer nor an interface: %s for %s", stringify(u), stringify(t))
+				}
+				var found bool
+				for k, t := range types {
+					if t.AssignableTo(u) {
+						adj[k][i] = true
+						found = true
+					}
+				}
+				if !found {
+					return nil, fmt.Errorf("dependency not enough: %s for %s", stringify(u), stringify(t))
+				}
 			}
 		}
 	}
@@ -101,17 +110,34 @@ func (b Builder) Build() (interface{}, error) {
 			for i, k := range []int(err) {
 				if i == 0 {
 					sb.WriteString("  ")
-					sb.WriteString(stringify(funcs[k]))
+					if funcs[k] == nil {
+						sb.WriteString(stringify(types[k]))
+					} else {
+						sb.WriteString(stringify(funcs[k]))
+					}
 				} else {
 					sb.WriteString("\n    -> ")
-					for t, j := funcs[k], 0; j < t.NumIn(); j++ {
-						if types[prev].AssignableTo(t.In(j)) {
-							sb.WriteString(stringify(t.In(j)))
-							break
+					if funcs[k] == nil {
+						for t, j := types[k].Elem(), 0; j < t.NumField(); j++ {
+							if types[prev].AssignableTo(t.Field(j).Type) {
+								sb.WriteString(stringify(t.Field(j).Type))
+								break
+							}
+						}
+					} else {
+						for t, j := funcs[k], 0; j < t.NumIn(); j++ {
+							if types[prev].AssignableTo(t.In(j)) {
+								sb.WriteString(stringify(t.In(j)))
+								break
+							}
 						}
 					}
 					sb.WriteString(" for ")
-					sb.WriteString(stringify(funcs[k]))
+					if funcs[k] == nil {
+						sb.WriteString(stringify(types[k]))
+					} else {
+						sb.WriteString(stringify(funcs[k]))
+					}
 				}
 				prev = k
 			}
