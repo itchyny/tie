@@ -178,6 +178,8 @@ func newZ2E(w W2) (*z2, error) { return &z2{w}, nil }
 
 func (z *z2) FooZ() int { return z.w.FooW() }
 
+func (z *z2) FooW() int { return 0 }
+
 type w2 struct {
 	v int
 }
@@ -218,7 +220,7 @@ func TestBuilderDiamondDependencyNotEnoughError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "dependency not enough: y2#w"; got != expected {
+	if got, expected := err.Error(), "dependency not enough: z2#w"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }
@@ -350,7 +352,7 @@ func TestBuilderFuncCyclicError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}
-	if got, expected := err.Error(), "dependency has a cycle"; !strings.Contains(got, expected) {
+	if got, expected := err.Error(), "dependency not enough: *tie.w3 for func(*tie.w3) *tie.w3"; got != expected {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
 }

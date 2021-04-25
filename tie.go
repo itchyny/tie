@@ -74,7 +74,7 @@ func (b Builder) Build() (interface{}, error) {
 			for j := 0; j < t.NumField(); j++ {
 				u := t.Field(j).Type
 				for k, t := range types {
-					if t.AssignableTo(u) {
+					if i != k && t.AssignableTo(u) {
 						adj[k][i] = true
 					}
 				}
@@ -87,7 +87,7 @@ func (b Builder) Build() (interface{}, error) {
 				}
 				var found bool
 				for k, t := range types {
-					if t.AssignableTo(u) {
+					if i != k && t.AssignableTo(u) {
 						adj[k][i] = true
 						found = true
 					}
