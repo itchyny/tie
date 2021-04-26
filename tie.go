@@ -223,10 +223,10 @@ func stringify(t reflect.Type) string {
 }
 
 func tsort(n int, adj [][]bool) ([]int, error) {
-	ts := make([]int, 0, n)
-	qs := make([]int, 0, n)
-	vs := make([]bool, n)
-	deg := make([]int, n)
+	ts := make([]int, 0, n) // result
+	qs := make([]int, 0, n) // breadth-first search
+	vs := make([]bool, n)   // visited
+	deg := make([]int, n)   // indegree
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
 			if adj[i][j] {
@@ -257,32 +257,33 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 	if len(ts) == n {
 		return ts, nil
 	}
-	var pss [][]int
+	var ps [][2]int // linked list
+	var ks []int    // depth-first search
 	for i := 0; i < n; i++ {
 		if !vs[i] {
-			pss = append(pss, []int{i})
+			ks = append(ks, len(ps))
+			ps = append(ps, [2]int{i, -1})
 		}
 	}
-	var ps []int
-	for len(pss) > 0 {
-		ps, pss = pss[len(pss)-1], pss[:len(pss)-1]
-		i := ps[len(ps)-1]
-		for j, unused := 0, true; j < n; j++ {
+	for k := 0; len(ks) > 0; {
+		k, ks = ks[len(ks)-1], ks[:len(ks)-1]
+		for i, j := ps[k][0], 0; j < n; j++ {
 			if !vs[j] && adj[i][j] {
-				for k, l := range ps {
-					if j == l {
-						return nil, cycleError(append(ps[k:], j))
+				for l, m := k, 2; ; m++ {
+					if j == ps[l][0] {
+						xs := make([]int, m)
+						xs[len(xs)-1] = j
+						for m -= 2; k >= 0 && m >= 0; m-- {
+							xs[m], k = ps[k][0], ps[k][1]
+						}
+						return nil, cycleError(xs)
+					}
+					if l = ps[l][1]; l < 0 {
+						break
 					}
 				}
-				if unused {
-					pss = append(pss, append(ps, j))
-					unused = false
-				} else {
-					qs = make([]int, len(ps)+1)
-					copy(qs, ps)
-					qs[len(qs)-1] = j
-					pss = append(pss, qs)
-				}
+				ks = append(ks, len(ps))
+				ps = append(ps, [2]int{j, k})
 			}
 		}
 	}
