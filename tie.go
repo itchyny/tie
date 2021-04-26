@@ -267,14 +267,22 @@ func tsort(n int, adj [][]bool) ([]int, error) {
 	for len(pss) > 0 {
 		ps, pss = pss[len(pss)-1], pss[:len(pss)-1]
 		i := ps[len(ps)-1]
-		for j := 0; j < n; j++ {
+		for j, unused := 0, true; j < n; j++ {
 			if !vs[j] && adj[i][j] {
 				for k, l := range ps {
 					if j == l {
 						return nil, cycleError(append(ps[k:], j))
 					}
 				}
-				pss = append(pss, append(ps, j))
+				if unused {
+					pss = append(pss, append(ps, j))
+					unused = false
+				} else {
+					qs = make([]int, len(ps)+1)
+					copy(qs, ps)
+					qs[len(qs)-1] = j
+					pss = append(pss, qs)
+				}
 			}
 		}
 	}

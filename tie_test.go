@@ -483,6 +483,14 @@ func TestTsort(t *testing.T) {
 		},
 		{
 			adj: [][]bool{
+				{false, false, false},
+				{true, false, true},
+				{true, true, false},
+			},
+			err: cycleError{2, 1, 2},
+		},
+		{
+			adj: [][]bool{
 				{false, false, true},
 				{true, false, false},
 				{false, true, false},
@@ -546,6 +554,16 @@ func TestTsort(t *testing.T) {
 				{true, false, false, false, false},
 			},
 			err: cycleError{4, 0, 1, 3, 4},
+		},
+		{
+			adj: [][]bool{
+				{false, false, false, false, true},
+				{false, false, false, false, false},
+				{true, true, false, false, false},
+				{false, false, true, false, false},
+				{false, false, false, true, false},
+			},
+			err: cycleError{4, 3, 2, 0, 4},
 		},
 	}
 	for _, tc := range testCases {
